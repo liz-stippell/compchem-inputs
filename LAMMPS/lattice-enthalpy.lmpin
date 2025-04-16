@@ -1,0 +1,97 @@
+# set periodic boundaries, units and thero-baro damping
+boundary p p p
+atom_style charge
+units metal
+variable THERMO_DAMP equal 0.1
+variable BARO_DAMP equal 0.5
+
+
+# import UO2 single cell fluorite structure and assign atom labels
+read_data UO2-single_cell.lmpstruct
+variable O equal 1
+variable U equal 2
+
+# set charges
+set type $O charge -1.1104
+set type $U charge 2.2208
+
+# define interatomic potential via coulombic and embed_UO2.fs tabulation 
+# kspace_style pppm 1.0e-5
+# variable SR_CUTOFF equal 11.0
+# pair_style hybrid/overlay coul/long ${SR_CUTOFF} eam/alloy
+# pair_coeff   *    *    coul/long
+# pair_coeff   *    *    eam/alloy CeThUNpPuAmCmO.eam.alloy O U
+
+pair_style ani 8 ../../../model_UO2_03.info
+#pair_style ani 8 ../../01_active_learning/0044/ensemble_0044.info
+pair_coeff * * O U
+
+#Perform minimization
+fix boxrelax_fix all box/relax aniso 0.0 vmax 0.001
+thermo 1
+thermo_style custom step cpu press etotal lx cella cellb cellc cellalpha cellbeta cellgamma
+min_style sd
+min_modify line quadratic dmax 0.05
+minimize 1.0e-25 1.0e-25 1000 10000
+unfix boxrelax_fix
+
+
+# Create 4x4x4 supercell containing 768 atoms
+replicate 4 4 4
+
+variable T equal 2000.0 #200.0
+variable T_STEP equal 100.0
+
+# create initial velocities and set timestep
+velocity all create ${T} 160278
+#timestep 0.002 # 2fs
+timestep 0.0002 # 0.2fs
+
+dump		1 all custom 20000 traj_uo2.lmtrj id element x y z
+dump_modify	1 sort id element U O
+
+label loop
+variable NEW_TEMP equal ${T}+${T_STEP}
+
+# Set-up thermostat
+variable T equal ${NEW_TEMP}
+fix thermostat_fix all npt temp ${T} ${T} ${THERMO_DAMP} aniso 0.0 0.0 ${BARO_DAMP}
+
+thermo_style custom step temp enthalpy lx vol
+thermo 10
+
+neigh_modify delay 0 every 1 check yes
+
+variable lx equal lx
+variable enthalpy equal enthalpy
+variable step equal step
+variable temp equal temp
+
+#variable AVG_START equal step+2500
+variable AVG_START equal step+40000
+#fix avg_enthalpy_fix all ave/time 1 2000 2000 v_enthalpy start ${AVG_START}
+#fix avg_lx_fix all ave/time 1 2000 2000 v_lx start ${AVG_START}
+
+fix avg_enthalpy_fix all ave/time 1 10000 10000 v_enthalpy start ${AVG_START}
+fix avg_lx_fix all ave/time 1 10000 10000 v_lx start ${AVG_START}
+
+#fix extra all print 1 "  ${step}  ${temp}  ${enthalpy}  ${lx}" file coord_300.txt
+
+# equilibrate for 50ps
+# run 25000
+
+# Run for 10ps
+#run 5000
+run 50000
+
+variable AVG_enthalpy equal f_avg_enthalpy_fix
+variable AVG_lx equal f_avg_lx_fix
+
+#print "OUTPUT:${temp}:${AVG_enthalpy}:${AVG_lx}" file test_{temp}.txt
+print "${T}  ${AVG_enthalpy}  ${AVG_lx}" file ${T}.txt
+
+
+if ${T}==3000.0 then "jump SELF break"
+jump SELF loop
+
+label break

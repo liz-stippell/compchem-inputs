@@ -1,0 +1,24 @@
+# INCAR for second guesses
+
+ISTART = 1
+
+IBRION = -1           ! CG
+ISMEAR = 0           ! Gaussian smearing
+SIGMA = 0.05         ! width of smearing in eV
+
+PREC = Accurate      ! medium precision
+EDIFF = 1e-6         ! electron relaxation criteria
+EDIFFG = -0.01        ! ion relaxation criteria
+NSW = 0             ! NSW sets the maximum number of ionic steps (unless the EDIFFG is reached)
+ENCUT= 400
+
+LWAVE = .FALSE.            ! Save wave function
+LCHARG = .FALSE.           ! Save charge densities
+
+LPARD = .TRUE.
+LPARDH5=.FALSE.
+LSEPB = .TRUE.
+IBAND = 316
+
+GGA = PE
+IVDW = 11
